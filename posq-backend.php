@@ -1,45 +1,59 @@
 <?php
 /**
- * Plugin Name: POSQ Backend API
- * Description: Modular POSQ REST API System
- * Version: 3.2.0
+ * Plugin Name: POSQ Backend API - Modular Structure
+ * Description: Complete POSQ REST API with clean architecture
+ * Version: 4.0.0
  * Author: TB
  * Text Domain: posq-backend
  */
 
 if (!defined('ABSPATH')) exit;
 
-// Constants
-define('POSQ_VERSION', '3.2.0');
-define('POSQ_PATH', plugin_dir_path(__FILE__));
-define('POSQ_URL', plugin_dir_url(__FILE__));
+// Define plugin constants
+define('POSQ_PLUGIN_DIR', plugin_dir_path(__FILE__));
+define('POSQ_PLUGIN_URL', plugin_dir_url(__FILE__));
+define('POSQ_VERSION', '4.0.0');
 
-// 1. Load Configurations & Helpers
-require_once POSQ_PATH . 'config/database-schema.php';
-require_once POSQ_PATH . 'includes/helpers.php';
+// Autoloader for plugin classes
+spl_autoload_register(function ($class) {
+    // Only autoload our classes
+    if (strpos($class, 'POSQ_') !== 0) {
+        return;
+    }
+    
+    // Convert class name to file path
+    $class = str_replace('POSQ_', '', $class);
+    $class = str_replace('_', '-', strtolower($class));
+    
+    // Try different directories
+    $paths = [
+        POSQ_PLUGIN_DIR . 'includes/class-' . $class . '.php',
+        POSQ_PLUGIN_DIR . 'api/class-' . $class . '.php',
+        POSQ_PLUGIN_DIR . 'api/endpoints/class-' . $class . '.php',
+        POSQ_PLUGIN_DIR . 'models/class-' . $class . '.php',
+    ];
+    
+    foreach ($paths as $path) {
+        if (file_exists($path)) {
+            require_once $path;
+            return;
+        }
+    }
+});
 
-// 2. Load Core Classes
-require_once POSQ_PATH . 'includes/class-posq-database.php';
-require_once POSQ_PATH . 'includes/class-posq-auth.php';
-require_once POSQ_PATH . 'includes/class-posq-permissions.php';
+// Load helper functions
+require_once POSQ_PLUGIN_DIR . 'includes/helpers.php';
 
-// 3. Load Models (Autoload all models)
-foreach (glob(POSQ_PATH . 'models/*.php') as $filename) {
-    require_once $filename;
-}
-
-// 4. Load API Layer
-require_once POSQ_PATH . 'api/class-posq-api-router.php';
-
-// Load all endpoint classes
-foreach (glob(POSQ_PATH . 'api/endpoints/*.php') as $filename) {
-    require_once $filename;
-}
-
-// Activation Hook
+// Register activation hook
 register_activation_hook(__FILE__, ['POSQ_Database', 'activate']);
 
-// Initialize Router
-add_action('plugins_loaded', function() {
-    POSQ_API_Router::init();
-});
+// Initialize plugin
+add_action('init', 'posq_init_plugin', 0);
+
+function posq_init_plugin() {
+    // Handle CORS
+    POSQ_Auth::handle_cors();
+    
+    // Register REST API routes
+    add_action('rest_api_init', ['POSQ_Api_Router', 'register_all_routes']);
+}

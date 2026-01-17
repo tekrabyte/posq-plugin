@@ -1,73 +1,11 @@
 <?php
 /**
- * Helper Functions for POSQ Backend
+ * Helper Functions
  * 
- * @package POSQ_Backend
- * @version 3.1.0
+ * Utility functions used throughout the plugin
  */
 
 if (!defined('ABSPATH')) exit;
-
-/**
- * Get plugin base path
- */
-function posq_get_plugin_path() {
-    return plugin_dir_path(dirname(__FILE__));
-}
-
-/**
- * Get plugin base URL
- */
-function posq_get_plugin_url() {
-    return plugin_dir_url(dirname(__FILE__));
-}
-
-/**
- * Sanitize array recursively
- */
-function posq_sanitize_array($array) {
-    if (!is_array($array)) {
-        return sanitize_text_field($array);
-    }
-    
-    foreach ($array as $key => $value) {
-        if (is_array($value)) {
-            $array[$key] = posq_sanitize_array($value);
-        } else {
-            $array[$key] = sanitize_text_field($value);
-        }
-    }
-    
-    return $array;
-}
-
-/**
- * Check if user is owner/admin
- */
-function posq_is_owner($user_id = null) {
-    if (!$user_id) $user_id = get_current_user_id();
-    $user = new WP_User($user_id);
-    return in_array('administrator', (array) $user->roles);
-}
-
-/**
- * Get user role (owner, manager, cashier)
- */
-function posq_get_user_role($user_id = null) {
-    if (!$user_id) $user_id = get_current_user_id();
-    
-    if (posq_is_owner($user_id)) {
-        return 'owner';
-    }
-
-    global $wpdb;
-    $profile = $wpdb->get_row($wpdb->prepare(
-        "SELECT role FROM {$wpdb->prefix}posq_user_profiles WHERE user_id = %d",
-        $user_id
-    ));
-
-    return $profile ? $profile->role : 'cashier';
-}
 
 /**
  * Format user data for API response
@@ -80,7 +18,7 @@ function posq_format_user_data($user) {
         $user->ID
     ));
 
-    $role = posq_get_user_role($user->ID);
+    $role = POSQ_Permissions::get_user_role($user->ID);
 
     return [
         'id' => (string) $user->ID,
@@ -91,18 +29,68 @@ function posq_format_user_data($user) {
         'outletId' => $profile && $profile->outlet_id ? (string) $profile->outlet_id : null,
         'status' => 'active',
         'avatar' => get_avatar_url($user->ID),
-        'is_admin' => posq_is_owner($user->ID)
+        'is_admin' => POSQ_Permissions::is_owner($user->ID)
     ];
 }
 
 /**
- * Log error to debug log
+ * Log stock changes
  */
-function posq_log_error($message, $data = null) {
-    if (defined('WP_DEBUG') && WP_DEBUG === true) {
-        error_log('[POSQ Backend] ' . $message);
-        if ($data !== null) {
-            error_log(print_r($data, true));
-        }
+function posq_log_stock_change($product_id, $outlet_id, $operation, $quantity, $from_outlet = null, $to_outlet = null, $transaction_id = null) {
+    global $wpdb;
+    
+    $wpdb->insert($wpdb->prefix . 'posq_stock_logs', [
+        'product_id' => $product_id,
+        'outlet_id' => $outlet_id,
+        'operation' => $operation,
+        'quantity' => $quantity,
+        'from_outlet_id' => $from_outlet,
+        'to_outlet_id' => $to_outlet,
+        'user_id' => get_current_user_id(),
+        'reference_transaction_id' => $transaction_id
+    ]);
+}
+
+/**
+ * Crop image to 1:1 square ratio
+ */
+function posq_crop_image_to_square($file_path) {
+    $image_editor = wp_get_image_editor($file_path);
+    
+    if (is_wp_error($image_editor)) {
+        return $image_editor;
     }
+
+    $size = $image_editor->get_size();
+    $width = $size['width'];
+    $height = $size['height'];
+
+    // Calculate crop dimensions for 1:1 ratio
+    $new_size = min($width, $height);
+    $x = ($width - $new_size) / 2;
+    $y = ($height - $new_size) / 2;
+
+    // Crop to square
+    $image_editor->crop($x, $y, $new_size, $new_size);
+
+    // Save cropped image
+    $saved = $image_editor->save($file_path);
+    
+    if (is_wp_error($saved)) {
+        return $saved;
+    }
+
+    return $saved['path'];
+}
+
+/**
+ * Get token from request headers
+ */
+function posq_get_token_from_request($request) {
+    $auth_header = $request->get_header('authorization');
+    if ($auth_header && preg_match('/Bearer\s+(\S+)/i', $auth_header, $matches)) {
+        return trim($matches[1]);
+    }
+    $x_token = $request->get_header('x-posq-token');
+    return $x_token ? trim($x_token) : null;
 }

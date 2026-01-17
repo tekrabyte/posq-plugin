@@ -1,77 +1,101 @@
 <?php
 /**
- * POSQ Authentication Handler
+ * Authentication Handler
  * 
- * @package POSQ_Backend
- * @version 3.1.0
+ * Manages user authentication, CORS, and token management
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Auth {
-
+    
     /**
-     * Get token from request
+     * Handle CORS for API requests
      */
-    public static function get_token_from_request($request) {
-        $auth_header = $request->get_header('authorization');
-        if ($auth_header && preg_match('/Bearer\s+(\S+)/i', $auth_header, $matches)) {
-            return trim($matches[1]);
+    public static function handle_cors() {
+        $origin = get_http_origin();
+        $allowed = [
+            'http://localhost:3000',
+            'http://192.168.1.7:3000',
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'https://erpos.tekrabyte.id',
+        ];
+        
+        if ($origin && in_array($origin, $allowed, true)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header("Access-Control-Allow-Credentials: true");
+            header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
+            header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Posq-Token");
         }
-        $x_token = $request->get_header('x-posq-token');
-        return $x_token ? trim($x_token) : null;
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            status_header(200);
+            exit;
+        }
     }
-
+    
     /**
-     * Check if user is authenticated
+     * Login endpoint
+     */
+    public static function login($request) {
+        $data = $request->get_json_params();
+        
+        if (empty($data['username']) || empty($data['password'])) {
+            return new WP_Error('bad_request', 'Missing credentials', ['status' => 400]);
+        }
+        
+        $user = wp_authenticate($data['username'], $data['password']);
+        
+        if (is_wp_error($user)) {
+            return new WP_Error('invalid_login', 'Invalid credentials', ['status' => 401]);
+        }
+        
+        $token = bin2hex(random_bytes(32));
+        update_user_meta($user->ID, 'posq_api_token', $token);
+        
+        return [
+            'success' => true,
+            'token' => $token,
+            'user' => posq_format_user_data($user)
+        ];
+    }
+    
+    /**
+     * Get current user info
+     */
+    public static function auth_me() {
+        $user = wp_get_current_user();
+        return [
+            'success' => true,
+            'user' => posq_format_user_data($user)
+        ];
+    }
+    
+    /**
+     * Check if current user is admin
+     */
+    public static function is_admin() {
+        return ['isAdmin' => POSQ_Permissions::is_owner()];
+    }
+    
+    /**
+     * Check authentication from request token
      */
     public static function check_auth($request) {
-        $token = self::get_token_from_request($request);
+        $token = posq_get_token_from_request($request);
         if (!$token) return false;
-
+        
         global $wpdb;
         $user_id = $wpdb->get_var($wpdb->prepare(
             "SELECT user_id FROM {$wpdb->usermeta} WHERE meta_key = 'posq_api_token' AND meta_value = %s LIMIT 1",
             $token
         ));
-
+        
         if ($user_id) {
             wp_set_current_user($user_id);
             return true;
         }
         return false;
-    }
-
-    /**
-     * Check if user is owner (admin)
-     */
-    public static function check_owner($request) {
-        if (!self::check_auth($request)) return false;
-        return posq_is_owner();
-    }
-
-    /**
-     * Check if user is manager or owner
-     */
-    public static function check_manager($request) {
-        if (!self::check_auth($request)) return false;
-        $role = posq_get_user_role();
-        return in_array($role, ['owner', 'manager']);
-    }
-
-    /**
-     * Check if user can access outlet
-     */
-    public static function can_access_outlet($outlet_id) {
-        $user_id = get_current_user_id();
-        if (posq_is_owner($user_id)) return true;
-
-        global $wpdb;
-        $profile = $wpdb->get_row($wpdb->prepare(
-            "SELECT outlet_id FROM {$wpdb->prefix}posq_user_profiles WHERE user_id = %d",
-            $user_id
-        ));
-
-        return $profile && $profile->outlet_id == $outlet_id;
     }
 }
