@@ -1,42 +1,11 @@
 <?php
 /**
- * Category Management Endpoints
- * 
- * @package POSQ_Backend
- * @version 3.2.0
+ * Category Endpoints
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Category_Endpoints {
-
-    public static function register_routes($namespace) {
-        register_rest_route($namespace, '/categories', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_categories'],
-                'permission_callback' => [POSQ_Auth::class, 'check_auth']
-            ],
-            [
-                'methods' => 'POST',
-                'callback' => [self::class, 'create_category'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-
-        register_rest_route($namespace, '/categories/(?P<id>\\d+)', [
-            [
-                'methods' => 'PUT',
-                'callback' => [self::class, 'update_category'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ],
-            [
-                'methods' => 'DELETE',
-                'callback' => [self::class, 'delete_category'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-    }
 
     public static function get_categories() {
         global $wpdb;

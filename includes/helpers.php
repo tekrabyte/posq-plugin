@@ -1,8 +1,6 @@
 <?php
 /**
  * Helper Functions
- * 
- * Utility functions used throughout the plugin
  */
 
 if (!defined('ABSPATH')) exit;
@@ -18,7 +16,7 @@ function posq_format_user_data($user) {
         $user->ID
     ));
 
-    $role = POSQ_Permissions::get_user_role($user->ID);
+    $role = posq_get_user_role($user->ID);
 
     return [
         'id' => (string) $user->ID,
@@ -29,12 +27,56 @@ function posq_format_user_data($user) {
         'outletId' => $profile && $profile->outlet_id ? (string) $profile->outlet_id : null,
         'status' => 'active',
         'avatar' => get_avatar_url($user->ID),
-        'is_admin' => POSQ_Permissions::is_owner($user->ID)
+        'is_admin' => posq_is_owner($user->ID)
     ];
 }
 
 /**
- * Log stock changes
+ * Check if user is owner/administrator
+ */
+function posq_is_owner($user_id = null) {
+    if (!$user_id) $user_id = get_current_user_id();
+    $user = new WP_User($user_id);
+    return in_array('administrator', (array) $user->roles);
+}
+
+/**
+ * Get user role (owner, manager, cashier)
+ */
+function posq_get_user_role($user_id = null) {
+    if (!$user_id) $user_id = get_current_user_id();
+    
+    if (posq_is_owner($user_id)) {
+        return 'owner';
+    }
+
+    global $wpdb;
+    $profile = $wpdb->get_row($wpdb->prepare(
+        "SELECT role FROM {$wpdb->prefix}posq_user_profiles WHERE user_id = %d",
+        $user_id
+    ));
+
+    return $profile ? $profile->role : 'cashier';
+}
+
+/**
+ * Check if user can access outlet
+ */
+function posq_can_access_outlet($outlet_id) {
+    $user_id = get_current_user_id();
+    if (posq_is_owner($user_id)) return true;
+
+    global $wpdb;
+    $profile = $wpdb->get_row($wpdb->prepare(
+        "SELECT outlet_id FROM {$wpdb->prefix}posq_user_profiles WHERE user_id = %d",
+        $user_id
+    ));
+
+    return $profile && $profile->outlet_id == $outlet_id;
+}
+
+/**
+ * Log stock change
  */
 function posq_log_stock_change($product_id, $outlet_id, $operation, $quantity, $from_outlet = null, $to_outlet = null, $transaction_id = null) {
     global $wpdb;
@@ -81,16 +123,4 @@ function posq_crop_image_to_square($file_path) {
     }
 
     return $saved['path'];
-}
-
-/**
- * Get token from request headers
- */
-function posq_get_token_from_request($request) {
-    $auth_header = $request->get_header('authorization');
-    if ($auth_header && preg_match('/Bearer\s+(\S+)/i', $auth_header, $matches)) {
-        return trim($matches[1]);
-    }
-    $x_token = $request->get_header('x-posq-token');
-    return $x_token ? trim($x_token) : null;
 }

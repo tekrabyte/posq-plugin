@@ -1,42 +1,11 @@
 <?php
 /**
- * Brand Management Endpoints
- * 
- * @package POSQ_Backend
- * @version 3.2.0
+ * Brand Endpoints
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Brand_Endpoints {
-
-    public static function register_routes($namespace) {
-        register_rest_route($namespace, '/brands', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_brands'],
-                'permission_callback' => [POSQ_Auth::class, 'check_auth']
-            ],
-            [
-                'methods' => 'POST',
-                'callback' => [self::class, 'create_brand'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-
-        register_rest_route($namespace, '/brands/(?P<id>\\d+)', [
-            [
-                'methods' => 'PUT',
-                'callback' => [self::class, 'update_brand'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ],
-            [
-                'methods' => 'DELETE',
-                'callback' => [self::class, 'delete_brand'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-    }
 
     public static function get_brands() {
         global $wpdb;

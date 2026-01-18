@@ -1,86 +1,72 @@
 <?php
 /**
- * Database Management
- * 
- * Handles database setup, migrations, and schema updates
+ * Database Setup & Migrations
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Database {
-    
-    const DB_VERSION = '4.0.0';
-    
+
+    const DB_VERSION = '3.1.0';
+
     /**
-     * Plugin activation - Create all database tables
+     * Plugin Activation - Create all database tables
      */
     public static function activate() {
         global $wpdb;
-        $charset_collate = $wpdb->get_charset_collate();
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-        
-        // Load schema definitions
-        $schemas = require POSQ_PLUGIN_DIR . 'config/database-schema.php';
-        
-        // Create tables
+
+        // Create all tables from schema
+        $schemas = POSQ_Schema::get_schemas();
         foreach ($schemas as $table_name => $sql) {
-            $sql = str_replace('{prefix}', $wpdb->prefix, $sql);
-            $sql = str_replace('{charset_collate}', $charset_collate, $sql);
             dbDelta($sql);
         }
-        
-        // Run migrations
+
+        // Run migrations for existing tables
         self::run_migrations();
-        
+
         // Insert default data
         self::insert_default_menu_access();
         self::insert_default_payment_methods();
-        
-        // Update DB version
+
         update_option('posq_db_version', self::DB_VERSION);
     }
-    
+
     /**
-     * Run database migrations for existing tables
+     * Run database migrations for existing installations
      */
     private static function run_migrations() {
         global $wpdb;
-        
-        // Migration: Add columns if they don't exist
-        $migrations = [
-            'posq_packages' => ['image_url', 'category_id', 'promo_enabled', 'applied_promo_id'],
-            'posq_bundles' => ['image_url', 'category_id', 'promo_enabled', 'applied_promo_id'],
-            'posq_products' => ['promo_enabled', 'promo_type', 'promo_value', 'applied_promo_id'],
-            'posq_expenses' => ['type', 'payment_method', 'image_url'],
-            'posq_transactions' => ['order_type', 'table_number', 'customer_name', 'status']
-        ];
-        
-        foreach ($migrations as $table => $columns) {
-            $table_name = $wpdb->prefix . $table;
-            
-            // Check if table exists
-            $table_exists = $wpdb->get_var("SHOW TABLES LIKE '$table_name'") === $table_name;
-            if (!$table_exists) continue;
-            
-            $existing_columns = $wpdb->get_col("DESCRIBE {$table_name}");
-            
-            foreach ($columns as $column) {
-                if (!in_array($column, $existing_columns)) {
-                    self::add_missing_column($table_name, $column);
-                }
-            }
+
+        // Migration: Add image_url to packages
+        $packages_table = $wpdb->prefix . 'posq_packages';
+        $packages_columns = $wpdb->get_col("DESCRIBE {$packages_table}");
+        if (!in_array('image_url', $packages_columns)) {
+            $wpdb->query("ALTER TABLE {$packages_table} ADD COLUMN image_url varchar(500) AFTER is_active");
         }
-    }
-    
-    /**
-     * Add missing column based on column name
-     */
-    private static function add_missing_column($table, $column) {
-        global $wpdb;
         
-        $column_definitions = [
-            'image_url' => 'varchar(500)',
-            'category_id' => 'bigint(20) UNSIGNED NULL',
+        // Migration: Add image_url to bundles
+        $bundles_table = $wpdb->prefix . 'posq_bundles';
+        $bundles_columns = $wpdb->get_col("DESCRIBE {$bundles_table}");
+        if (!in_array('image_url', $bundles_columns)) {
+            $wpdb->query("ALTER TABLE {$bundles_table} ADD COLUMN image_url varchar(500) AFTER manual_stock");
+        }
+        
+        // Migration: Add category_id to packages
+        if (!in_array('category_id', $packages_columns)) {
+            $wpdb->query("ALTER TABLE {$packages_table} ADD COLUMN category_id bigint(20) UNSIGNED NULL AFTER outlet_id");
+        }
+        
+        // Migration: Add category_id to bundles
+        if (!in_array('category_id', $bundles_columns)) {
+            $wpdb->query("ALTER TABLE {$bundles_table} ADD COLUMN category_id bigint(20) UNSIGNED NULL AFTER outlet_id");
+        }
+
+        // Migration: Add promo columns to products
+        $products_table = $wpdb->prefix . 'posq_products';
+        $products_columns = $wpdb->get_col("DESCRIBE {$products_table}");
+        
+        $promo_columns = [
             'promo_enabled' => 'tinyint(1) DEFAULT 0',
             'promo_type' => "varchar(20) DEFAULT 'fixed'",
             'promo_value' => 'decimal(10,2) DEFAULT 0',
@@ -91,9 +77,44 @@ class POSQ_Database {
             'promo_end_date' => 'date',
             'promo_min_purchase' => 'decimal(10,2)',
             'promo_description' => 'text',
-            'applied_promo_id' => 'bigint(20) UNSIGNED NULL',
-            'type' => "varchar(20) DEFAULT 'expense'",
-            'payment_method' => 'varchar(100)',
+            'applied_promo_id' => 'bigint(20) UNSIGNED NULL'
+        ];
+
+        foreach ($promo_columns as $column => $definition) {
+            if (!in_array($column, $products_columns)) {
+                $wpdb->query("ALTER TABLE {$products_table} ADD COLUMN {$column} {$definition}");
+            }
+        }
+
+        // Add same promo columns to packages and bundles
+        foreach ($promo_columns as $column => $definition) {
+            if (!in_array($column, $packages_columns)) {
+                $wpdb->query("ALTER TABLE {$packages_table} ADD COLUMN {$column} {$definition}");
+            }
+            if (!in_array($column, $bundles_columns)) {
+                $wpdb->query("ALTER TABLE {$bundles_table} ADD COLUMN {$column} {$definition}");
+            }
+        }
+
+        // Migration: Update expenses table
+        $expenses_table = $wpdb->prefix . 'posq_expenses';
+        $expenses_columns = $wpdb->get_col("DESCRIBE {$expenses_table}");
+        
+        if (!in_array('type', $expenses_columns)) {
+            $wpdb->query("ALTER TABLE {$expenses_table} ADD COLUMN type varchar(20) DEFAULT 'expense' AFTER category");
+        }
+        if (!in_array('payment_method', $expenses_columns)) {
+            $wpdb->query("ALTER TABLE {$expenses_table} ADD COLUMN payment_method varchar(100) AFTER type");
+        }
+        if (!in_array('image_url', $expenses_columns)) {
+            $wpdb->query("ALTER TABLE {$expenses_table} ADD COLUMN image_url varchar(500) AFTER payment_method");
+        }
+
+        // Migration: Add order tracking fields to transactions
+        $transactions_table = $wpdb->prefix . 'posq_transactions';
+        $transactions_columns = $wpdb->get_col("DESCRIBE {$transactions_table}");
+        
+        $order_columns = [
             'order_type' => 'varchar(50)',
             'table_number' => 'varchar(50)',
             'customer_name' => 'varchar(255)',
@@ -101,24 +122,24 @@ class POSQ_Database {
             'notes' => 'text',
             'status' => "varchar(50) DEFAULT 'pending'"
         ];
-        
-        if (isset($column_definitions[$column])) {
-            $sql = "ALTER TABLE {$table} ADD COLUMN {$column} {$column_definitions[$column]}";
-            $wpdb->query($sql);
+
+        foreach ($order_columns as $column => $definition) {
+            if (!in_array($column, $transactions_columns)) {
+                $wpdb->query("ALTER TABLE {$transactions_table} ADD COLUMN {$column} {$definition}");
+            }
         }
+
+        // Migration: Allow NULL for outlet_id in bundles (factory bundles)
+        $wpdb->query("ALTER TABLE {$wpdb->prefix}posq_bundles MODIFY COLUMN outlet_id bigint(20) UNSIGNED NULL");
     }
-    
+
     /**
      * Insert default menu access configuration
      */
     private static function insert_default_menu_access() {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_menu_access';
-        
-        // Check if already populated
-        $count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
-        if ($count > 0) return;
-        
+
         $defaults = [
             // Cashier
             ['cashier', 'dashboard', 1],
@@ -151,7 +172,7 @@ class POSQ_Database {
             ['owner', 'categories', 1],
             ['owner', 'settings', 1],
         ];
-        
+
         foreach ($defaults as $row) {
             $wpdb->replace($table, [
                 'role' => $row[0],
@@ -160,18 +181,18 @@ class POSQ_Database {
             ]);
         }
     }
-    
+
     /**
-     * Insert default payment methods
+     * Insert default payment methods configuration
      */
     private static function insert_default_payment_methods() {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_payment_methods_config';
-        
+
         // Check if already populated
         $count = $wpdb->get_var("SELECT COUNT(*) FROM $table");
         if ($count > 0) return;
-        
+
         $defaults = [
             [
                 'id' => 'cash',
@@ -237,9 +258,61 @@ class POSQ_Database {
                 'fee' => 2.5,
                 'fee_type' => 'percentage',
                 'config_data' => null
+            ],
+            [
+                'id' => 'ewallet',
+                'name' => 'E-Wallet',
+                'category' => 'online',
+                'sub_category' => 'eWallet',
+                'enabled' => 0,
+                'icon' => 'Smartphone',
+                'color' => 'bg-teal-500',
+                'is_default' => 1,
+                'fee' => 1.0,
+                'fee_type' => 'percentage',
+                'config_data' => null
+            ],
+            [
+                'id' => 'gofood',
+                'name' => 'GoFood',
+                'category' => 'foodDelivery',
+                'sub_category' => 'goFood',
+                'enabled' => 0,
+                'icon' => 'UtensilsCrossed',
+                'color' => 'bg-green-600',
+                'is_default' => 1,
+                'fee' => 20,
+                'fee_type' => 'percentage',
+                'config_data' => null
+            ],
+            [
+                'id' => 'grabfood',
+                'name' => 'GrabFood',
+                'category' => 'foodDelivery',
+                'sub_category' => 'grabFood',
+                'enabled' => 0,
+                'icon' => 'UtensilsCrossed',
+                'color' => 'bg-emerald-600',
+                'is_default' => 1,
+                'fee' => 20,
+                'fee_type' => 'percentage',
+                'config_data' => null
+            ],
+            [
+                'id' => 'shopeefood',
+                'name' => 'ShopeeFood',
+                'category' => 'foodDelivery',
+                'sub_category' => 'shopeeFood',
+                'enabled' => 0,
+                'icon' => 'UtensilsCrossed',
+                'color' => 'bg-orange-600',
+                'is_default' => 1,
+                'fee' => 20,
+                'fee_type' => 'percentage',
+                'config_data' => null
             ]
         ];
-        
+
         foreach ($defaults as $method) {
             $wpdb->replace($table, $method);
         }

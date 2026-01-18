@@ -1,42 +1,11 @@
 <?php
 /**
- * User Management Endpoints
- * 
- * @package POSQ_Backend
- * @version 3.2.0
+ * User Endpoints
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_User_Endpoints {
-
-    public static function register_routes($namespace) {
-        register_rest_route($namespace, '/users', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_users'],
-                'permission_callback' => [POSQ_Auth::class, 'check_auth']
-            ],
-            [
-                'methods' => 'POST',
-                'callback' => [self::class, 'create_user'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-
-        register_rest_route($namespace, '/users/(?P<id>\\d+)', [
-            [
-                'methods' => 'PUT',
-                'callback' => [self::class, 'update_user'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ],
-            [
-                'methods' => 'DELETE',
-                'callback' => [self::class, 'delete_user'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-    }
 
     public static function get_users() {
         $users = get_users();

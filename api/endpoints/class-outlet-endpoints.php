@@ -1,42 +1,11 @@
 <?php
 /**
- * Outlet Management Endpoints
- * 
- * @package POSQ_Backend
- * @version 3.2.0
+ * Outlet Endpoints
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Outlet_Endpoints {
-
-    public static function register_routes($namespace) {
-        register_rest_route($namespace, '/outlets', [
-            [
-                'methods' => 'GET',
-                'callback' => [self::class, 'get_outlets'],
-                'permission_callback' => [POSQ_Auth::class, 'check_auth']
-            ],
-            [
-                'methods' => 'POST',
-                'callback' => [self::class, 'create_outlet'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-
-        register_rest_route($namespace, '/outlets/(?P<id>\\d+)', [
-            [
-                'methods' => 'PUT',
-                'callback' => [self::class, 'update_outlet'],
-                'permission_callback' => [POSQ_Auth::class, 'check_auth']
-            ],
-            [
-                'methods' => 'DELETE',
-                'callback' => [self::class, 'delete_outlet'],
-                'permission_callback' => [POSQ_Permissions::class, 'check_owner_permission']
-            ]
-        ]);
-    }
 
     public static function get_outlets() {
         global $wpdb;
