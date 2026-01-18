@@ -282,36 +282,16 @@ class POSQ_API_Router {
     }
 
     /**
-     * Load all endpoint files
+     * Load all endpoint files automatically
      */
     private static function load_endpoints() {
-        $endpoint_files = [
-            'class-auth-endpoints.php',
-            'class-user-endpoints.php',
-            'class-outlet-endpoints.php',
-            'class-category-endpoints.php',
-            'class-brand-endpoints.php',
-            'class-product-endpoints.php',
-            'class-package-endpoints.php',
-            'class-bundle-endpoints.php',
-            'class-transaction-endpoints.php',
-            'class-stock-endpoints.php',
-            'class-expense-endpoints.php',
-            'class-customer-endpoints.php',
-            'class-cashflow-endpoints.php',
-            'class-report-endpoints.php',
-            'class-payment-method-endpoints.php',
-            'class-menu-access-endpoints.php',
-            'class-held-order-endpoints.php',
-            'class-kitchen-order-endpoints.php',
-            'class-promo-endpoints.php',
-            'class-upload-endpoints.php'
-        ];
-
-        foreach ($endpoint_files as $file) {
-            $path = POSQ_PLUGIN_DIR . 'api/endpoints/' . $file;
-            if (file_exists($path)) {
-                require_once $path;
+        $endpoint_files = glob(POSQ_PLUGIN_DIR . 'api/endpoints/*.php');
+        
+        if ($endpoint_files) {
+            foreach ($endpoint_files as $endpoint_file) {
+                if (file_exists($endpoint_file)) {
+                    require_once $endpoint_file;
+                }
             }
         }
     }

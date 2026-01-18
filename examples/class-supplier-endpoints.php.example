@@ -1,0 +1,249 @@
+<?php
+/**
+ * Example: How to Add New Endpoint
+ * 
+ * This is an example file showing how to create new API endpoints.
+ * Simply create this file in api/endpoints/ folder and it will be auto-loaded!
+ * 
+ * File: api/endpoints/class-supplier-endpoints.php
+ * 
+ * @package POSQ_Backend
+ * @version 3.2.0
+ */
+
+if (!defined('ABSPATH')) exit;
+
+class POSQ_Supplier_Endpoints {
+    
+    /**
+     * Get all suppliers
+     */
+    public static function get_suppliers($request) {
+        try {
+            $suppliers = POSQ_Supplier_Model::get_all();
+            
+            return rest_ensure_response([
+                'success' => true,
+                'data' => $suppliers
+            ]);
+            
+        } catch (Exception $e) {
+            return new WP_Error(
+                'supplier_error',
+                $e->getMessage(),
+                ['status' => 500]
+            );
+        }
+    }
+    
+    /**
+     * Get single supplier
+     */
+    public static function get_supplier($request) {
+        $id = $request['id'];
+        
+        try {
+            $supplier = POSQ_Supplier_Model::get_by_id($id);
+            
+            if (!$supplier) {
+                return new WP_Error(
+                    'supplier_not_found',
+                    'Supplier tidak ditemukan',
+                    ['status' => 404]
+                );
+            }
+            
+            return rest_ensure_response([
+                'success' => true,
+                'data' => $supplier
+            ]);
+            
+        } catch (Exception $e) {
+            return new WP_Error(
+                'supplier_error',
+                $e->getMessage(),
+                ['status' => 500]
+            );
+        }
+    }
+    
+    /**
+     * Create new supplier
+     */
+    public static function create_supplier($request) {
+        $body = json_decode($request->get_body(), true);
+        
+        // Validation
+        if (empty($body['name'])) {
+            return new WP_Error(
+                'invalid_data',
+                'Nama supplier wajib diisi',
+                ['status' => 400]
+            );
+        }
+        
+        try {
+            $new_id = POSQ_Supplier_Model::create($body);
+            
+            if (!$new_id) {
+                return new WP_Error(
+                    'create_failed',
+                    'Gagal membuat supplier',
+                    ['status' => 500]
+                );
+            }
+            
+            $supplier = POSQ_Supplier_Model::get_by_id($new_id);
+            
+            return rest_ensure_response([
+                'success' => true,
+                'message' => 'Supplier berhasil dibuat',
+                'data' => $supplier
+            ]);
+            
+        } catch (Exception $e) {
+            return new WP_Error(
+                'supplier_error',
+                $e->getMessage(),
+                ['status' => 500]
+            );
+        }
+    }
+    
+    /**
+     * Update supplier
+     */
+    public static function update_supplier($request) {
+        $id = $request['id'];
+        $body = json_decode($request->get_body(), true);
+        
+        // Check if exists
+        $existing = POSQ_Supplier_Model::get_by_id($id);
+        if (!$existing) {
+            return new WP_Error(
+                'supplier_not_found',
+                'Supplier tidak ditemukan',
+                ['status' => 404]
+            );
+        }
+        
+        try {
+            $updated = POSQ_Supplier_Model::update($id, $body);
+            
+            if ($updated === false) {
+                return new WP_Error(
+                    'update_failed',
+                    'Gagal mengupdate supplier',
+                    ['status' => 500]
+                );
+            }
+            
+            $supplier = POSQ_Supplier_Model::get_by_id($id);
+            
+            return rest_ensure_response([
+                'success' => true,
+                'message' => 'Supplier berhasil diupdate',
+                'data' => $supplier
+            ]);
+            
+        } catch (Exception $e) {
+            return new WP_Error(
+                'supplier_error',
+                $e->getMessage(),
+                ['status' => 500]
+            );
+        }
+    }
+    
+    /**
+     * Delete supplier
+     */
+    public static function delete_supplier($request) {
+        $id = $request['id'];
+        
+        // Check if exists
+        $existing = POSQ_Supplier_Model::get_by_id($id);
+        if (!$existing) {
+            return new WP_Error(
+                'supplier_not_found',
+                'Supplier tidak ditemukan',
+                ['status' => 404]
+            );
+        }
+        
+        try {
+            $deleted = POSQ_Supplier_Model::delete($id);
+            
+            if (!$deleted) {
+                return new WP_Error(
+                    'delete_failed',
+                    'Gagal menghapus supplier',
+                    ['status' => 500]
+                );
+            }
+            
+            return rest_ensure_response([
+                'success' => true,
+                'message' => 'Supplier berhasil dihapus'
+            ]);
+            
+        } catch (Exception $e) {
+            return new WP_Error(
+                'supplier_error',
+                $e->getMessage(),
+                ['status' => 500]
+            );
+        }
+    }
+}
+
+/*
+ * AFTER CREATING THIS FILE, ADD ROUTES IN:
+ * api/class-posq-api-router.php -> register_routes() method
+ * 
+ * ADD THIS CODE:
+ * 
+ * // Suppliers
+ * register_rest_route($namespace, '/suppliers', [
+ *     ['methods' => 'GET', 'callback' => ['POSQ_Supplier_Endpoints', 'get_suppliers'], 'permission_callback' => ['POSQ_Permissions', 'check_auth']],
+ *     ['methods' => 'POST', 'callback' => ['POSQ_Supplier_Endpoints', 'create_supplier'], 'permission_callback' => ['POSQ_Permissions', 'check_owner']]
+ * ]);
+ * 
+ * register_rest_route($namespace, '/suppliers/(?P<id>\d+)', [
+ *     ['methods' => 'GET', 'callback' => ['POSQ_Supplier_Endpoints', 'get_supplier'], 'permission_callback' => ['POSQ_Permissions', 'check_auth']],
+ *     ['methods' => 'PUT', 'callback' => ['POSQ_Supplier_Endpoints', 'update_supplier'], 'permission_callback' => ['POSQ_Permissions', 'check_owner']],
+ *     ['methods' => 'DELETE', 'callback' => ['POSQ_Supplier_Endpoints', 'delete_supplier'], 'permission_callback' => ['POSQ_Permissions', 'check_owner']]
+ * ]);
+ * 
+ * 
+ * API ENDPOINTS CREATED:
+ * 
+ * GET    /wp-json/posq/v1/suppliers           - Get all suppliers
+ * POST   /wp-json/posq/v1/suppliers           - Create supplier
+ * GET    /wp-json/posq/v1/suppliers/{id}      - Get single supplier
+ * PUT    /wp-json/posq/v1/suppliers/{id}      - Update supplier
+ * DELETE /wp-json/posq/v1/suppliers/{id}      - Delete supplier
+ * 
+ * 
+ * EXAMPLE REQUESTS:
+ * 
+ * # Get all suppliers
+ * curl -X GET http://your-site.com/wp-json/posq/v1/suppliers \
+ *   -H "Authorization: Bearer YOUR_TOKEN"
+ * 
+ * # Create supplier
+ * curl -X POST http://your-site.com/wp-json/posq/v1/suppliers \
+ *   -H "Authorization: Bearer YOUR_TOKEN" \
+ *   -H "Content-Type: application/json" \
+ *   -d '{"name":"PT ABC","contact":"08123456789","address":"Jl. Example"}'
+ * 
+ * # Update supplier
+ * curl -X PUT http://your-site.com/wp-json/posq/v1/suppliers/1 \
+ *   -H "Authorization: Bearer YOUR_TOKEN" \
+ *   -H "Content-Type: application/json" \
+ *   -d '{"name":"PT ABC Updated","contact":"08123456789"}'
+ * 
+ * # Delete supplier
+ * curl -X DELETE http://your-site.com/wp-json/posq/v1/suppliers/1 \
+ *   -H "Authorization: Bearer YOUR_TOKEN"
+ */

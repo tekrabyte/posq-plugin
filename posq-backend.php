@@ -21,24 +21,13 @@ require_once POSQ_PLUGIN_DIR . 'includes/class-posq-auth.php';
 require_once POSQ_PLUGIN_DIR . 'includes/class-posq-permissions.php';
 require_once POSQ_PLUGIN_DIR . 'config/database-schema.php';
 
-// Require all models
-require_once POSQ_PLUGIN_DIR . 'models/class-outlet-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-category-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-brand-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-product-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-package-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-bundle-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-transaction-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-stock-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-expense-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-customer-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-user-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-payment-method-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-menu-access-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-held-order-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-kitchen-order-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-promo-model.php';
-require_once POSQ_PLUGIN_DIR . 'models/class-cashflow-model.php';
+// Require all models automatically
+$model_files = glob(POSQ_PLUGIN_DIR . 'models/*.php');
+if ($model_files) {
+    foreach ($model_files as $model_file) {
+        require_once $model_file;
+    }
+}
 
 // Require API Router
 require_once POSQ_PLUGIN_DIR . 'api/class-posq-api-router.php';

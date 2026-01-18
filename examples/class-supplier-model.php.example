@@ -1,0 +1,116 @@
+<?php
+/**
+ * Example: How to Add New Model
+ * 
+ * This is an example file showing how to create a new model.
+ * Simply create this file in models/ folder and it will be auto-loaded!
+ * 
+ * File: models/class-supplier-model.php
+ * 
+ * @package POSQ_Backend
+ * @version 3.2.0
+ */
+
+if (!defined('ABSPATH')) exit;
+
+class POSQ_Supplier_Model {
+    
+    /**
+     * Get all suppliers
+     */
+    public static function get_all() {
+        global $wpdb;
+        $table = $wpdb->prefix . 'posq_suppliers';
+        
+        return $wpdb->get_results("SELECT * FROM {$table} ORDER BY name ASC");
+    }
+    
+    /**
+     * Get supplier by ID
+     */
+    public static function get_by_id($id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'posq_suppliers';
+        
+        return $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM {$table} WHERE id = %d",
+            $id
+        ));
+    }
+    
+    /**
+     * Create new supplier
+     */
+    public static function create($data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'posq_suppliers';
+        
+        $inserted = $wpdb->insert($table, [
+            'name' => sanitize_text_field($data['name']),
+            'contact' => sanitize_text_field($data['contact']),
+            'address' => sanitize_textarea_field($data['address']),
+            'created_at' => current_time('mysql')
+        ]);
+        
+        if ($inserted) {
+            return $wpdb->insert_id;
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Update supplier
+     */
+    public static function update($id, $data) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'posq_suppliers';
+        
+        return $wpdb->update(
+            $table,
+            [
+                'name' => sanitize_text_field($data['name']),
+                'contact' => sanitize_text_field($data['contact']),
+                'address' => sanitize_textarea_field($data['address']),
+            ],
+            ['id' => $id]
+        );
+    }
+    
+    /**
+     * Delete supplier
+     */
+    public static function delete($id) {
+        global $wpdb;
+        $table = $wpdb->prefix . 'posq_suppliers';
+        
+        return $wpdb->delete($table, ['id' => $id]);
+    }
+}
+
+/*
+ * USAGE EXAMPLE:
+ * 
+ * // Get all suppliers
+ * $suppliers = POSQ_Supplier_Model::get_all();
+ * 
+ * // Get single supplier
+ * $supplier = POSQ_Supplier_Model::get_by_id(1);
+ * 
+ * // Create supplier
+ * $new_id = POSQ_Supplier_Model::create([
+ *     'name' => 'PT ABC',
+ *     'contact' => '08123456789',
+ *     'address' => 'Jl. Example No. 123'
+ * ]);
+ * 
+ * // Update supplier
+ * POSQ_Supplier_Model::update(1, [
+ *     'name' => 'PT ABC Updated',
+ *     'contact' => '08123456789',
+ *     'address' => 'Jl. New Address'
+ * ]);
+ * 
+ * // Delete supplier
+ * POSQ_Supplier_Model::delete(1);
+ */
