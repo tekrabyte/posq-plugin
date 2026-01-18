@@ -6,24 +6,16 @@
 
 if (!defined('ABSPATH')) exit;
 
+require_once POSQ_PLUGIN_DIR . 'models/class-cashflow-model.php';
+
 class POSQ_Cashflow_Endpoints {
 
     public static function get_cashflow_categories() {
-        global $wpdb;
-        $table = $wpdb->prefix . 'posq_cashflow_categories';
-        
-        $categories = $wpdb->get_results("SELECT * FROM $table ORDER BY id DESC");
+        $categories = POSQ_Cashflow_Model::get_all();
         
         $data = [];
         foreach ($categories as $cat) {
-            $data[] = [
-                'id' => (int) $cat->id,
-                'name' => $cat->name,
-                'type' => $cat->type,
-                'description' => $cat->description,
-                'created_at' => $cat->created_at,
-                'is_active' => (bool) $cat->is_active
-            ];
+            $data[] = POSQ_Cashflow_Model::format($cat);
         }
         
         return $data;
@@ -36,34 +28,24 @@ class POSQ_Cashflow_Endpoints {
             return new WP_Error('missing_fields', 'Name and type required', ['status' => 400]);
         }
 
-        global $wpdb;
-        $wpdb->insert($wpdb->prefix . 'posq_cashflow_categories', [
-            'name' => sanitize_text_field($data['name']),
-            'type' => sanitize_text_field($data['type']),
-            'description' => sanitize_textarea_field($data['description'] ?? ''),
-            'is_active' => 1
-        ]);
+        $id = POSQ_Cashflow_Model::create($data);
+        
+        if (!$id) {
+            return new WP_Error('insert_failed', 'Failed to create category', ['status' => 500]);
+        }
 
-        return ['success' => true, 'id' => $wpdb->insert_id];
+        return ['success' => true, 'id' => $id];
     }
 
     public static function update_cashflow_category($request) {
         $id = (int) $request['id'];
         $data = $request->get_json_params();
 
-        global $wpdb;
-        $update_data = [];
+        $result = POSQ_Cashflow_Model::update($id, $data);
         
-        if (!empty($data['name'])) $update_data['name'] = sanitize_text_field($data['name']);
-        if (!empty($data['type'])) $update_data['type'] = sanitize_text_field($data['type']);
-        if (isset($data['description'])) $update_data['description'] = sanitize_textarea_field($data['description']);
-        if (isset($data['is_active'])) $update_data['is_active'] = (int) $data['is_active'];
-
-        $wpdb->update(
-            $wpdb->prefix . 'posq_cashflow_categories',
-            $update_data,
-            ['id' => $id]
-        );
+        if ($result === false) {
+            return new WP_Error('update_failed', 'Failed to update category', ['status' => 500]);
+        }
 
         return ['success' => true];
     }
@@ -71,8 +53,11 @@ class POSQ_Cashflow_Endpoints {
     public static function delete_cashflow_category($request) {
         $id = (int) $request['id'];
         
-        global $wpdb;
-        $wpdb->delete($wpdb->prefix . 'posq_cashflow_categories', ['id' => $id]);
+        $result = POSQ_Cashflow_Model::delete($id);
+        
+        if ($result === false) {
+            return new WP_Error('delete_failed', 'Cannot delete category in use', ['status' => 400]);
+        }
 
         return ['success' => true];
     }

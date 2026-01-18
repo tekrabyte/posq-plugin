@@ -6,45 +6,21 @@
 
 if (!defined('ABSPATH')) exit;
 
+require_once POSQ_PLUGIN_DIR . 'models/class-menu-access-model.php';
+
 class POSQ_Menu_Access_Endpoints {
 
     public static function get_menu_access() {
-        global $wpdb;
-        
-        $menus = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}posq_menu_access ORDER BY role, menu");
-        
-        $config = [
-            'cashier' => [],
-            'manager' => [],
-            'owner' => []
-        ];
-
-        foreach ($menus as $menu) {
-            $config[$menu->role][] = [
-                'menu' => $menu->menu,
-                'is_accessible' => (bool) $menu->is_accessible
-            ];
-        }
-
-        return $config;
+        return POSQ_Menu_Access_Model::format_grouped();
     }
 
     public static function save_menu_access($request) {
         $data = $request->get_json_params();
 
-        global $wpdb;
-        $table = $wpdb->prefix . 'posq_menu_access';
+        $result = POSQ_Menu_Access_Model::bulk_update($data);
 
-        foreach (['cashier', 'manager'] as $role) {
-            if (isset($data[$role])) {
-                foreach ($data[$role] as $menu_item) {
-                    $wpdb->replace($table, [
-                        'role' => $role,
-                        'menu' => $menu_item['menu'],
-                        'is_accessible' => $menu_item['is_accessible'] ? 1 : 0
-                    ]);
-                }
-            }
+        if (!$result) {
+            return new WP_Error('update_failed', 'Failed to update menu access', ['status' => 500]);
         }
 
         return ['success' => true];
@@ -53,18 +29,11 @@ class POSQ_Menu_Access_Endpoints {
     public static function get_role_menu_access() {
         $role = posq_get_user_role();
         
-        global $wpdb;
-        $menus = $wpdb->get_results($wpdb->prepare(
-            "SELECT * FROM {$wpdb->prefix}posq_menu_access WHERE role = %s",
-            $role
-        ));
+        $menus = POSQ_Menu_Access_Model::get_by_role($role);
 
         $data = [];
         foreach ($menus as $menu) {
-            $data[] = [
-                'menu' => $menu->menu,
-                'is_accessible' => (bool) $menu->is_accessible
-            ];
+            $data[] = POSQ_Menu_Access_Model::format($menu);
         }
 
         return $data;
