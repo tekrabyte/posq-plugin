@@ -1,36 +1,20 @@
 <?php
 /**
  * Transaction Endpoints
- * 
- * Handles transaction endpoints
+ * Handles transaction operations
  */
 
 if (!defined('ABSPATH')) exit;
 
+require_once POSQ_PLUGIN_DIR . 'models/class-transaction-model.php';
+
 class POSQ_Transaction_Endpoints {
-    
-    public static function register_routes($namespace) {
-        register_rest_route($namespace, '/transactions', [
-            [
-                'methods' => 'GET',
-                'callback' => [__CLASS__, 'get_transactions'],
-                'permission_callback' => ['POSQ_Auth', 'check_auth']
-            ],
-            [
-                'methods' => 'POST',
-                'callback' => [__CLASS__, 'create_transaction'],
-                'permission_callback' => ['POSQ_Auth', 'check_auth']
-            ]
-        ]);
+
+    public static function get_transactions($request) {
+        return POSQ_Transaction_Model::get_all($request);
     }
-    
-    public static function get_transactions() {
-        $model = new POSQ_Transaction_Model();
-        return $model->get_all();
-    }
-    
+
     public static function create_transaction($request) {
-        $model = new POSQ_Transaction_Model();
-        return $model->create($request);
+        return POSQ_Transaction_Model::create($request);
     }
 }

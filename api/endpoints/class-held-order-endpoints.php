@@ -1,54 +1,54 @@
 <?php
 /**
- * Held Order Endpoints - Handle held orders (saved carts)
+ * Held Order Endpoints
+ * Handles held orders (cart save/resume)
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Held_Order_Endpoints {
 
-    /**
-     * Get all held orders for current user's outlet
-     */
     public static function get_held_orders($request) {
         global $wpdb;
         $user_id = get_current_user_id();
         
         // Get user's outlet
-        $user_outlet = get_user_meta($user_id, 'posq_outlet_id', true);
+        $profile = $wpdb->get_row($wpdb->prepare(
+            "SELECT outlet_id FROM {$wpdb->prefix}posq_user_profiles WHERE user_id = %d",
+            $user_id
+        ));
         
         $table = $wpdb->prefix . 'posq_held_orders';
         
-        if ($user_outlet) {
+        if ($profile && $profile->outlet_id) {
             $held_orders = $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $table WHERE outlet_id = %d ORDER BY created_at DESC",
-                $user_outlet
+                "SELECT * FROM $table WHERE outlet_id = %d ORDER BY timestamp DESC",
+                $profile->outlet_id
             ));
         } else {
             // For admin/owner, show all held orders
-            $held_orders = $wpdb->get_results("SELECT * FROM $table ORDER BY created_at DESC");
+            $held_orders = $wpdb->get_results("SELECT * FROM $table ORDER BY timestamp DESC");
         }
         
         $result = [];
         foreach ($held_orders as $order) {
             $result[] = [
-                'id' => $order->id,
-                'userId' => $order->user_id,
-                'outletId' => $order->outlet_id,
+                'id' => (int) $order->id,
+                'userId' => (int) $order->user_id,
+                'outletId' => (int) $order->outlet_id,
                 'cart' => json_decode($order->cart_data, true),
                 'paymentMethods' => json_decode($order->payment_methods_data, true),
-                'customerNote' => $order->customer_note,
                 'orderType' => $order->order_type,
-                'timestamp' => strtotime($order->created_at) * 1000 // Convert to milliseconds
+                'tableNumber' => $order->table_number,
+                'customerName' => $order->customer_name,
+                'notes' => $order->notes,
+                'timestamp' => strtotime($order->timestamp) * 1000
             ];
         }
         
         return $result;
     }
 
-    /**
-     * Create a held order
-     */
     public static function create_held_order($request) {
         global $wpdb;
         $user_id = get_current_user_id();
@@ -57,8 +57,10 @@ class POSQ_Held_Order_Endpoints {
         $outlet_id = !empty($data['outletId']) ? intval($data['outletId']) : null;
         $cart = !empty($data['cart']) ? $data['cart'] : [];
         $payment_methods = !empty($data['paymentMethods']) ? $data['paymentMethods'] : [];
-        $customer_note = !empty($data['customerNote']) ? sanitize_textarea_field($data['customerNote']) : null;
         $order_type = !empty($data['orderType']) ? sanitize_text_field($data['orderType']) : null;
+        $table_number = !empty($data['tableNumber']) ? sanitize_text_field($data['tableNumber']) : null;
+        $customer_name = !empty($data['customerName']) ? sanitize_text_field($data['customerName']) : null;
+        $notes = !empty($data['notes']) ? sanitize_textarea_field($data['notes']) : null;
         
         if (!$outlet_id || empty($cart)) {
             return new WP_Error('invalid_data', 'Outlet ID and cart are required', ['status' => 400]);
@@ -71,9 +73,10 @@ class POSQ_Held_Order_Endpoints {
             'outlet_id' => $outlet_id,
             'cart_data' => json_encode($cart),
             'payment_methods_data' => json_encode($payment_methods),
-            'customer_note' => $customer_note,
             'order_type' => $order_type,
-            'created_at' => current_time('mysql')
+            'table_number' => $table_number,
+            'customer_name' => $customer_name,
+            'notes' => $notes
         ]);
         
         if ($result === false) {
@@ -86,9 +89,6 @@ class POSQ_Held_Order_Endpoints {
         ];
     }
 
-    /**
-     * Delete a held order
-     */
     public static function delete_held_order($request) {
         global $wpdb;
         $id = intval($request['id']);

@@ -1,21 +1,22 @@
 <?php
 /**
- * Kitchen Order Endpoints - Handle kitchen order tracking
+ * Kitchen Order Endpoints
+ * Handles kitchen order tracking and status updates
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Kitchen_Order_Endpoints {
 
-    /**
-     * Get kitchen orders (transactions with kitchen-relevant statuses)
-     */
     public static function get_kitchen_orders($request) {
         global $wpdb;
         $user_id = get_current_user_id();
         
         // Get user's outlet
-        $user_outlet = get_user_meta($user_id, 'posq_outlet_id', true);
+        $profile = $wpdb->get_row($wpdb->prepare(
+            "SELECT outlet_id FROM {$wpdb->prefix}posq_user_profiles WHERE user_id = %d",
+            $user_id
+        ));
         
         $params = $request->get_params();
         $status = !empty($params['status']) ? sanitize_text_field($params['status']) : null;
@@ -26,9 +27,9 @@ class POSQ_Kitchen_Order_Endpoints {
         $where_clauses = ["status != 'completed'", "status != 'canceled'"];
         $query_params = [];
         
-        if ($user_outlet) {
+        if ($profile && $profile->outlet_id) {
             $where_clauses[] = "outlet_id = %d";
-            $query_params[] = $user_outlet;
+            $query_params[] = $profile->outlet_id;
         }
         
         if ($status) {
@@ -52,26 +53,30 @@ class POSQ_Kitchen_Order_Endpoints {
         foreach ($orders as $order) {
             $items_table = $wpdb->prefix . 'posq_transaction_items';
             $items = $wpdb->get_results($wpdb->prepare(
-                "SELECT * FROM $items_table WHERE transaction_id = %d",
+                "SELECT ti.*, p.name as product_name
+                FROM $items_table ti
+                LEFT JOIN {$wpdb->prefix}posq_products p ON ti.product_id = p.id
+                WHERE ti.transaction_id = %d",
                 $order->id
             ));
             
             $formatted_items = [];
             foreach ($items as $item) {
                 $formatted_items[] = [
-                    'productId' => $item->product_id,
-                    'quantity' => $item->quantity,
-                    'price' => $item->price,
+                    'productId' => (int) $item->product_id,
+                    'productName' => $item->product_name,
+                    'quantity' => (int) $item->quantity,
+                    'price' => (int) $item->price,
                     'isPackage' => (bool) $item->is_package,
                     'isBundle' => (bool) $item->is_bundle
                 ];
             }
             
             $result[] = [
-                'id' => $order->id,
-                'userId' => $order->user_id,
-                'outletId' => $order->outlet_id,
-                'total' => $order->total,
+                'id' => (int) $order->id,
+                'userId' => (int) $order->user_id,
+                'outletId' => (int) $order->outlet_id,
+                'total' => (int) $order->total,
                 'orderType' => $order->order_type,
                 'tableNumber' => $order->table_number,
                 'customerName' => $order->customer_name,
@@ -86,9 +91,6 @@ class POSQ_Kitchen_Order_Endpoints {
         return $result;
     }
 
-    /**
-     * Update kitchen order status
-     */
     public static function update_kitchen_order($request) {
         global $wpdb;
         $id = intval($request['id']);

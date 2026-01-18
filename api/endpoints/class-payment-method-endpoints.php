@@ -1,15 +1,13 @@
 <?php
 /**
- * Payment Method Endpoints - Handle payment method configuration
+ * Payment Method Configuration Endpoints
+ * Handles payment method settings
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Payment_Method_Endpoints {
 
-    /**
-     * Get all payment methods configuration
-     */
     public static function get_payment_methods() {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_payment_methods_config';
@@ -41,9 +39,6 @@ class POSQ_Payment_Method_Endpoints {
         return $data;
     }
 
-    /**
-     * Update payment method configuration
-     */
     public static function update_payment_method($request) {
         $id = sanitize_text_field($request['id']);
         $data = $request->get_json_params();
@@ -86,9 +81,6 @@ class POSQ_Payment_Method_Endpoints {
         return ['success' => true];
     }
 
-    /**
-     * Create custom payment method
-     */
     public static function create_custom_payment_method($request) {
         $data = $request->get_json_params();
         
@@ -128,9 +120,6 @@ class POSQ_Payment_Method_Endpoints {
         ];
     }
 
-    /**
-     * Delete custom payment method
-     */
     public static function delete_custom_payment_method($request) {
         $id = sanitize_text_field($request['id']);
         

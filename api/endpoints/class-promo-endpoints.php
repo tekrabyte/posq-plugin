@@ -1,15 +1,13 @@
 <?php
 /**
- * Promo Endpoints - Handle standalone promotions
+ * Promo Endpoints
+ * Handles standalone promo management
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Promo_Endpoints {
 
-    /**
-     * Get all standalone promos
-     */
     public static function get_standalone_promos() {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_standalone_promos';
@@ -38,9 +36,6 @@ class POSQ_Promo_Endpoints {
         return $result;
     }
 
-    /**
-     * Create standalone promo
-     */
     public static function create_standalone_promo($request) {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_standalone_promos';
@@ -64,9 +59,6 @@ class POSQ_Promo_Endpoints {
         return ['success' => true, 'id' => (string) $wpdb->insert_id];
     }
 
-    /**
-     * Update standalone promo
-     */
     public static function update_standalone_promo($request) {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_standalone_promos';
@@ -90,9 +82,6 @@ class POSQ_Promo_Endpoints {
         return ['success' => true, 'id' => (string) $id];
     }
 
-    /**
-     * Delete standalone promo (soft delete)
-     */
     public static function delete_standalone_promo($request) {
         global $wpdb;
         $table = $wpdb->prefix . 'posq_standalone_promos';

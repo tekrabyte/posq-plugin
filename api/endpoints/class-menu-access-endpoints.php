@@ -1,15 +1,13 @@
 <?php
 /**
- * Menu Access Endpoints - Handle menu access configuration
+ * Menu Access Endpoints
+ * Handles menu access configuration
  */
 
 if (!defined('ABSPATH')) exit;
 
 class POSQ_Menu_Access_Endpoints {
 
-    /**
-     * Get all menu access configuration
-     */
     public static function get_menu_access() {
         global $wpdb;
         
@@ -31,9 +29,6 @@ class POSQ_Menu_Access_Endpoints {
         return $config;
     }
 
-    /**
-     * Save menu access configuration
-     */
     public static function save_menu_access($request) {
         $data = $request->get_json_params();
 
@@ -55,11 +50,8 @@ class POSQ_Menu_Access_Endpoints {
         return ['success' => true];
     }
 
-    /**
-     * Get menu access for current user's role
-     */
     public static function get_role_menu_access() {
-        $role = POSQ_Permissions::get_user_role();
+        $role = posq_get_user_role();
         
         global $wpdb;
         $menus = $wpdb->get_results($wpdb->prepare(
